@@ -1,0 +1,167 @@
+name: Release
+
+on:
+  pull_request:
+    types: [closed]
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+    inputs:
+      version_bump:
+        description: 'Version bump type (patch, minor, or none to use current)'
+        required: false
+        default: 'none'
+        type: choice
+        options:
+          - none
+          - patch
+          - minor
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    # Run on manual trigger OR when a PR is merged (not just closed)
+    if: github.event_name == 'workflow_dispatch' || (github.event.pull_request.merged == true)
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get version info
+        id: version
+        run: |
+          # Extract current versions from module.prop
+          MOD_VERSION=$(grep "^version=" module.prop | cut -d'=' -f2 | sed 's/.*mod: (v\([^)]*\)).*/\1/')
+          RCLONE_VERSION=$(grep "^version=" module.prop | cut -d'=' -f2 | sed 's/.*rclone: (v\([^)]*\)).*/\1/')
+          VERSION_CODE=$(grep "^versionCode=" module.prop | cut -d'=' -f2)
+          
+          echo "mod_version=$MOD_VERSION" >> $GITHUB_OUTPUT
+          echo "rclone_version=$RCLONE_VERSION" >> $GITHUB_OUTPUT
+          echo "version_code=$VERSION_CODE" >> $GITHUB_OUTPUT
+          
+          echo "Module version: $MOD_VERSION"
+          echo "Rclone version: $RCLONE_VERSION"
+          echo "Version code: $VERSION_CODE"
+
+      - name: Bump version (if requested)
+        if: github.event.inputs.version_bump != 'none' && github.event.inputs.version_bump != ''
+        id: bump
+        run: |
+          CURRENT_VERSION="${{ steps.version.outputs.mod_version }}"
+          CURRENT_CODE="${{ steps.version.outputs.version_code }}"
+          BUMP_TYPE="${{ github.event.inputs.version_bump }}"
+          
+          # Parse version (format: X.Y)
+          MAJOR=$(echo "$CURRENT_VERSION" | cut -d'.' -f1)
+          MINOR=$(echo "$CURRENT_VERSION" | cut -d'.' -f2)
+          
+          if [ "$BUMP_TYPE" = "minor" ]; then
+            MINOR=$((MINOR + 1))
+          elif [ "$BUMP_TYPE" = "patch" ]; then
+            # For this module, patch bumps the minor version
+            MINOR=$((MINOR + 1))
+          fi
+          
+          NEW_VERSION="${MAJOR}.${MINOR}"
+          NEW_CODE=$((CURRENT_CODE + 1))
+          
+          # Update module.prop
+          sed -i "s/mod: (v${CURRENT_VERSION})/mod: (v${NEW_VERSION})/" module.prop
+          sed -i "s/versionCode=${CURRENT_CODE}/versionCode=${NEW_CODE}/" module.prop
+          
+          echo "new_mod_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "new_version_code=$NEW_CODE" >> $GITHUB_OUTPUT
+          
+          echo "Bumped version: $CURRENT_VERSION -> $NEW_VERSION"
+          echo "Bumped version code: $CURRENT_CODE -> $NEW_CODE"
+
+      - name: Commit version bump
+        if: github.event.inputs.version_bump != 'none' && github.event.inputs.version_bump != ''
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add module.prop
+          git commit -m "chore: bump version to v${{ steps.bump.outputs.new_mod_version }}"
+          git push
+
+      - name: Get final version
+        id: final_version
+        run: |
+          MOD_VERSION=$(grep "^version=" module.prop | cut -d'=' -f2 | sed 's/.*mod: (v\([^)]*\)).*/\1/')
+          RCLONE_VERSION=$(grep "^version=" module.prop | cut -d'=' -f2 | sed 's/.*rclone: (v\([^)]*\)).*/\1/')
+          
+          echo "mod_version=$MOD_VERSION" >> $GITHUB_OUTPUT
+          echo "rclone_version=$RCLONE_VERSION" >> $GITHUB_OUTPUT
+
+      - name: Build module
+        run: |
+          chmod +x build.sh
+          ./build.sh
+
+      - name: Get build artifact name
+        id: artifact
+        run: |
+          ARTIFACT=$(ls out/*.zip | head -1)
+          ARTIFACT_NAME=$(basename "$ARTIFACT")
+          echo "path=$ARTIFACT" >> $GITHUB_OUTPUT
+          echo "name=$ARTIFACT_NAME" >> $GITHUB_OUTPUT
+          echo "Built artifact: $ARTIFACT_NAME"
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          # Get commits since last tag
+          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          
+          if [ -n "$LAST_TAG" ]; then
+            echo "Generating changelog since $LAST_TAG"
+            CHANGELOG=$(git log --pretty=format:"- %s" "$LAST_TAG"..HEAD)
+          else
+            echo "No previous tag found, using recent commits"
+            CHANGELOG=$(git log --pretty=format:"- %s" -10)
+          fi
+          
+          # Write to file for multiline support
+          echo "$CHANGELOG" > changelog.txt
+          
+          echo "Changelog:"
+          cat changelog.txt
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.final_version.outputs.mod_version }}
+          name: v${{ steps.final_version.outputs.mod_version }} (rclone v${{ steps.final_version.outputs.rclone_version }})
+          body: |
+            ## Cloud Storage Mounter v${{ steps.final_version.outputs.mod_version }}
+            
+            Bundled with **rclone v${{ steps.final_version.outputs.rclone_version }}**
+            
+            ### Installation
+            1. Download the ZIP file below
+            2. Flash via Magisk, KernelSU, or APatch
+            3. Reboot your device
+            
+            ### Changes
+            ${{ steps.changelog.outputs.changelog }}
+            
+            ### Included Binaries
+            - rclone v${{ steps.final_version.outputs.rclone_version }}
+            - fusermount3 (from Termux)
+            - inotifywait (from Termux)
+            
+            ### Supported Architectures
+            - arm
+            - arm64
+            - x86
+            - x64
+          files: ${{ steps.artifact.outputs.path }}
+          draft: false
+          prerelease: false
+          generate_release_notes: true

@@ -1,0 +1,194 @@
+name: Update Binaries
+
+on:
+  schedule:
+    # Run weekly on Mondays at 00:00 UTC
+    - cron: '0 0 * * 1'
+  workflow_dispatch:
+    inputs:
+      force_update:
+        description: 'Force update even if versions match'
+        required: false
+        default: 'false'
+        type: boolean
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  update-binaries:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Get current rclone version
+        id: current_version
+        run: |
+          CURRENT_VERSION=$(grep "^version=" module.prop | sed 's/.*rclone: (v\([^)]*\)).*/\1/')
+          echo "version=$CURRENT_VERSION" >> $GITHUB_OUTPUT
+          echo "Current rclone version: $CURRENT_VERSION"
+
+      - name: Get latest rclone version
+        id: latest_version
+        run: |
+          LATEST_VERSION=$(curl -s https://api.github.com/repos/rclone/rclone/releases/latest | jq -r '.tag_name' | sed 's/^v//')
+          echo "version=$LATEST_VERSION" >> $GITHUB_OUTPUT
+          echo "Latest rclone version: $LATEST_VERSION"
+
+      - name: Check if update is needed
+        id: check_update
+        run: |
+          if [ "${{ steps.current_version.outputs.version }}" = "${{ steps.latest_version.outputs.version }}" ] && [ "${{ inputs.force_update }}" != "true" ]; then
+            echo "needs_update=false" >> $GITHUB_OUTPUT
+            echo "Already on latest version, skipping update"
+          else
+            echo "needs_update=true" >> $GITHUB_OUTPUT
+            echo "Update needed: ${{ steps.current_version.outputs.version }} -> ${{ steps.latest_version.outputs.version }}"
+          fi
+
+      - name: Download rclone binaries
+        if: steps.check_update.outputs.needs_update == 'true'
+        run: |
+          VERSION="${{ steps.latest_version.outputs.version }}"
+          
+          # Architecture mapping: folder name -> rclone archive name
+          declare -A ARCH_MAP=(
+            ["arm"]="linux-arm-v7"
+            ["arm64"]="linux-arm64"
+            ["x86"]="linux-386"
+            ["x64"]="linux-amd64"
+          )
+          
+          for arch in "${!ARCH_MAP[@]}"; do
+            rclone_arch="${ARCH_MAP[$arch]}"
+            echo "Downloading rclone for $arch ($rclone_arch)..."
+            
+            curl -L -o "rclone-${arch}.zip" \
+              "https://github.com/rclone/rclone/releases/download/v${VERSION}/rclone-v${VERSION}-${rclone_arch}.zip"
+            
+            unzip -o "rclone-${arch}.zip" -d "rclone-${arch}-tmp"
+            
+            # Find and copy the rclone binary
+            find "rclone-${arch}-tmp" -name "rclone" -type f -exec cp {} "common/binary/${arch}/rclone" \;
+            
+            # Cleanup
+            rm -rf "rclone-${arch}.zip" "rclone-${arch}-tmp"
+            
+            echo "Updated rclone for $arch"
+          done
+
+      - name: Download Termux binaries (fusermount3, inotifywait)
+        if: steps.check_update.outputs.needs_update == 'true'
+        run: |
+          # Architecture mapping: folder name -> Termux arch
+          declare -A TERMUX_ARCH_MAP=(
+            ["arm"]="arm"
+            ["arm64"]="aarch64"
+            ["x86"]="i686"
+            ["x64"]="x86_64"
+          )
+          
+          TERMUX_REPO="https://packages.termux.dev/apt/termux-main"
+          
+          for arch in "${!TERMUX_ARCH_MAP[@]}"; do
+            termux_arch="${TERMUX_ARCH_MAP[$arch]}"
+            echo "Downloading Termux binaries for $arch ($termux_arch)..."
+            
+            # Get package index
+            curl -L -o "Packages-${arch}.gz" "${TERMUX_REPO}/dists/stable/main/binary-${termux_arch}/Packages.gz"
+            gunzip -f "Packages-${arch}.gz"
+            
+            # Extract fusermount3 from fuse3 package
+            FUSE3_PATH=$(grep -A 20 "^Package: fuse3$" "Packages-${arch}" | grep "^Filename:" | head -1 | awk '{print $2}')
+            if [ -n "$FUSE3_PATH" ]; then
+              echo "Downloading fuse3 package..."
+              curl -L -o "fuse3-${arch}.deb" "${TERMUX_REPO}/${FUSE3_PATH}"
+              
+              mkdir -p "fuse3-${arch}-tmp"
+              ar x --output="fuse3-${arch}-tmp" "fuse3-${arch}.deb"
+              tar -xf "fuse3-${arch}-tmp/data.tar.xz" -C "fuse3-${arch}-tmp"
+              
+              # Copy fusermount3 binary
+              find "fuse3-${arch}-tmp" -name "fusermount3" -type f -exec cp {} "common/binary/${arch}/fusermount3" \;
+              
+              rm -rf "fuse3-${arch}.deb" "fuse3-${arch}-tmp"
+            fi
+            
+            # Extract inotifywait from inotify-tools package
+            INOTIFY_PATH=$(grep -A 20 "^Package: inotify-tools$" "Packages-${arch}" | grep "^Filename:" | head -1 | awk '{print $2}')
+            if [ -n "$INOTIFY_PATH" ]; then
+              echo "Downloading inotify-tools package..."
+              curl -L -o "inotify-tools-${arch}.deb" "${TERMUX_REPO}/${INOTIFY_PATH}"
+              
+              mkdir -p "inotify-tools-${arch}-tmp"
+              ar x --output="inotify-tools-${arch}-tmp" "inotify-tools-${arch}.deb"
+              tar -xf "inotify-tools-${arch}-tmp/data.tar.xz" -C "inotify-tools-${arch}-tmp"
+              
+              # Copy inotifywait binary
+              find "inotify-tools-${arch}-tmp" -name "inotifywait" -type f -exec cp {} "common/binary/${arch}/inotifywait" \;
+              
+              rm -rf "inotify-tools-${arch}.deb" "inotify-tools-${arch}-tmp"
+            fi
+            
+            rm -f "Packages-${arch}"
+            echo "Updated Termux binaries for $arch"
+          done
+
+      - name: Update module.prop version
+        if: steps.check_update.outputs.needs_update == 'true'
+        run: |
+          NEW_VERSION="${{ steps.latest_version.outputs.version }}"
+          
+          # Update rclone version in module.prop
+          sed -i "s/rclone: (v[^)]*)/rclone: (v${NEW_VERSION})/" module.prop
+          
+          echo "Updated module.prop with rclone version $NEW_VERSION"
+          cat module.prop
+
+      - name: Check for changes
+        if: steps.check_update.outputs.needs_update == 'true'
+        id: check_changes
+        run: |
+          if git diff --quiet; then
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+          else
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create Pull Request
+        if: steps.check_update.outputs.needs_update == 'true' && steps.check_changes.outputs.has_changes == 'true'
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: "chore: update binaries to rclone v${{ steps.latest_version.outputs.version }}"
+          title: "Update binaries to rclone v${{ steps.latest_version.outputs.version }}"
+          body: |
+            ## Automated Binary Update
+            
+            This PR updates the bundled binaries:
+            
+            - **rclone**: `v${{ steps.current_version.outputs.version }}` → `v${{ steps.latest_version.outputs.version }}`
+            - **fusermount3**: Updated from Termux packages
+            - **inotifywait**: Updated from Termux packages
+            
+            ### Architectures Updated
+            - arm
+            - arm64
+            - x86
+            - x64
+            
+            ### Changelog
+            See [rclone releases](https://github.com/rclone/rclone/releases/tag/v${{ steps.latest_version.outputs.version }}) for details.
+            
+            ---
+            *This PR was automatically created by the update-binaries workflow.*
+          branch: update-binaries-${{ steps.latest_version.outputs.version }}
+          delete-branch: true
+          labels: |
+            dependencies
+            automated
