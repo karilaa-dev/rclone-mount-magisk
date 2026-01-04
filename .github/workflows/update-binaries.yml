@@ -2,8 +2,8 @@ name: Update Binaries
 
 on:
   schedule:
-    # Run weekly on Mondays at 00:00 UTC
-    - cron: '0 0 * * 1'
+    # Run monthly on the 1st at 00:00 UTC
+    - cron: '0 0 1 * *'
   workflow_dispatch:
     inputs:
       force_update:
