@@ -1,4 +1,14 @@
-## Changelog (forked)
+# Changelog
+
+### v1.15
+* Updated for Android 11+ (API 30+) compatibility
+* Upgraded from `fusermount` to `fusermount3` for modern Android support
+* Updated all binaries to latest versions:
+  - `rclone` (1.72.1)
+  - `fusermount3` (from fuse3)
+  - `inotifywait` (latest from Termux)
+  - `libandroid-support.so` (latest from Termux)
+* Added GitHub Actions for automated binary updates and releases
 
 ### v1.14 (binary updates)
 * Updated rclone to 1.56.0 for all supported architectures.
@@ -15,8 +25,6 @@
   - `rclone` (1.55.0)
   - `fusermount` (2.9.9)
   - `inotifywait` (3.20.11.0)
-
-## Changelog (source)
 
 ### v1.13
 * Add arm/arm64 1.53 binaries downloaded from https://beta.rclone.org/v1.53.0/testbuilds/rclone-android-16-arm.gz
