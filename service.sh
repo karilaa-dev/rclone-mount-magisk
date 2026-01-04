@@ -45,7 +45,7 @@ M_GID=1015
 DIRPERMS=0775
 FILEPERMS=0644
 UMASK=002
-BINDSD=0
+BINDSD=1
 SYNC_WIFI=1
 SYNC_CHARGE=0
 SYNC_BATTLVL=0
@@ -114,70 +114,91 @@ net_chk() {
 
 sd_unbind () {
     if [[ -z ${SDBINDPOINT} ]]; then
+        # Unbind legacy paths (Android 10 and below)
         UNBINDPOINT=${BINDPOINT_D}/${remote}
         su -M -c umount -lf ${UNBINDPOINT} >> /dev/null 2>&1
         UNBINDPOINT=${BINDPOINT_R}/${remote}
         su -M -c umount -lf ${UNBINDPOINT} >> /dev/null 2>&1
         UNBINDPOINT=${BINDPOINT_W}/${remote}
         su -M -c umount -lf ${UNBINDPOINT} >> /dev/null 2>&1
+        # Unbind Android 11+ path
+        UNBINDPOINT=${DATA_MEDIA}/${PROFILE}/Cloud/${remote}
+        su -M -c umount -lf ${UNBINDPOINT} >> /dev/null 2>&1
     else
         USER_BINDPOINT=${SDBINDPOINT}
+        # Unbind legacy paths
         UNBINDPOINT=${RUNTIME_D}/emulated/${PROFILE}/${USER_BINDPOINT}
         su -M -c umount -lf ${UNBINDPOINT} >> /dev/null 2>&1
         UNBINDPOINT=${RUNTIME_R}/emulated/${PROFILE}/${USER_BINDPOINT}
         su -M -c umount -lf ${UNBINDPOINT} >> /dev/null 2>&1
         UNBINDPOINT=${RUNTIME_W}/emulated/${PROFILE}/${USER_BINDPOINT}
         su -M -c umount -lf ${UNBINDPOINT} >> /dev/null 2>&1
+        # Unbind Android 11+ path
+        UNBINDPOINT=${DATA_MEDIA}/${PROFILE}/${USER_BINDPOINT}
+        su -M -c umount -lf ${UNBINDPOINT} >> /dev/null 2>&1
     fi
 }
 
 sd_binder () {
-    if [[ -d ${RUNTIME_D} ]] && [[ ${BINDSD} = 1 ]]; then
-        if [[ -z ${SDBINDPOINT} ]]; then
-            mkdir -p ${DATA_MEDIA}/${PROFILE}/Cloud/${remote}
-            chown media_rw:media_rw ${DATA_MEDIA}/${PROFILE}/Cloud/$remote
+    if [[ ${BINDSD} != 1 ]]; then
+        return
+    fi
 
+    # Detect Android version
+    API=$(getprop ro.build.version.sdk)
+
+    if [[ -z ${SDBINDPOINT} ]]; then
+        mkdir -p ${DATA_MEDIA}/${PROFILE}/Cloud/${remote}
+        chown media_rw:media_rw ${DATA_MEDIA}/${PROFILE}/Cloud/${remote}
+
+        if [[ ${API} -ge 30 ]]; then
+            # Android 11+ (API 30+): bind directly to /data/media which is the underlying storage for /sdcard
+            BINDPOINT=${DATA_MEDIA}/${PROFILE}/Cloud/${remote}
+            su -M -c mount --bind ${CLOUDROOTMOUNTPOINT}/${remote} ${BINDPOINT} >> /dev/null 2>&1
+        elif [[ -d ${RUNTIME_D} ]]; then
+            # Android 10 and below: use /mnt/runtime paths
             BINDPOINT=${BINDPOINT_D}/${remote}
-
             su -M -c mount --bind ${CLOUDROOTMOUNTPOINT}/${remote} ${BINDPOINT} >> /dev/null 2>&1
 
             BINDPOINT=${BINDPOINT_R}/${remote}
-
             if ! mount |grep -q ${BINDPOINT}; then
                 su -M -c mount --bind ${CLOUDROOTMOUNTPOINT}/${remote} ${BINDPOINT} >> /dev/null 2>&1
             fi
 
             BINDPOINT=${BINDPOINT_W}/${remote}
-
             if ! mount |grep -q ${BINDPOINT}; then
                 su -M -c mount --bind ${CLOUDROOTMOUNTPOINT}/${remote} ${BINDPOINT} >> /dev/null 2>&1
             fi
+        fi
 
-            echo "[$remote] available at: -> [/sdcard/Cloud/${remote}]"
-        else
-            mkdir ${DATA_MEDIA}/${PROFILE}/${SDBINDPOINT} >> /dev/null 2>&1
-            chown media_rw:media_rw ${DATA_MEDIA}/${PROFILE}/${SDBINDPOINT}
+        echo "[$remote] available at: -> [/sdcard/Cloud/${remote}]"
+    else
+        mkdir ${DATA_MEDIA}/${PROFILE}/${SDBINDPOINT} >> /dev/null 2>&1
+        chown media_rw:media_rw ${DATA_MEDIA}/${PROFILE}/${SDBINDPOINT}
+        USER_BINDPOINT=${SDBINDPOINT}
 
-            USER_BINDPOINT=${SDBINDPOINT}
+        if [[ ${API} -ge 30 ]]; then
+            # Android 11+ (API 30+): bind directly to /data/media
+            BINDPOINT=${DATA_MEDIA}/${PROFILE}/${USER_BINDPOINT}
+            su -M -c mount --bind ${CLOUDROOTMOUNTPOINT}/${remote} ${BINDPOINT} >> /dev/null 2>&1
+        elif [[ -d ${RUNTIME_D} ]]; then
+            # Android 10 and below
             BINDPOINT=${RUNTIME_D}/emulated/${PROFILE}/${USER_BINDPOINT}
-
             su -M -c mount --bind ${CLOUDROOTMOUNTPOINT}/${remote} ${BINDPOINT} >> /dev/null 2>&1
 
             BINDPOINT=${RUNTIME_R}/emulated/${PROFILE}/${USER_BINDPOINT}
-
             if ! mount |grep -q ${BINDPOINT}; then
                 su -M -c mount --bind ${CLOUDROOTMOUNTPOINT}/${remote} ${BINDPOINT} >> /dev/null 2>&1
             fi
 
             BINDPOINT=${RUNTIME_W}/emulated/${PROFILE}/${USER_BINDPOINT}
-
             if ! mount |grep -q ${BINDPOINT}; then
                 su -M -c mount --bind ${CLOUDROOTMOUNTPOINT}/${remote} ${BINDPOINT} >> /dev/null 2>&1
             fi
-
-            echo "[$remote] available at: -> [/storage/emulated/${PROFILE}/${SDBINDPOINT}]"
-            unset BINDPOINT
         fi
+
+        echo "[$remote] available at: -> [/storage/emulated/${PROFILE}/${SDBINDPOINT}]"
+        unset BINDPOINT
     fi
 }
 
@@ -280,7 +301,7 @@ rclone_mount () {
 
     echo "[${remote}] available at: -> [${CLOUDROOTMOUNTPOINT}/${remote}]"
     mkdir -p ${CLOUDROOTMOUNTPOINT}/${remote}
-    su -M -p -c nice -n 19 ionice -c 2 -n 7 ${MODDIR}/rclone mount "${remote}:${SUBPATH}" ${CLOUDROOTMOUNTPOINT}/${remote} --config ${CONFIGFILE} ${RCLONE_PARAMS} --daemon >> /dev/null 2>&1 &
+    su -M -p -c "PATH=${MODDIR}:/system/bin:\$PATH nice -n 19 ionice -c 2 -n 7 ${MODDIR}/rclone mount \"${remote}:${SUBPATH}\" ${CLOUDROOTMOUNTPOINT}/${remote} --config ${CONFIGFILE} ${RCLONE_PARAMS} --daemon" >> /dev/null 2>&1 &
 }
 
 COUNT=0

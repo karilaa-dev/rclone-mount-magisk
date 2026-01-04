@@ -41,15 +41,16 @@ REPLACE="
 
 set_permissions() {
     set_perm $MODPATH/rclone 0 0 0755
-    set_perm $MODPATH/system/bin/fusermount 0 0 0755
+    set_perm $MODPATH/fusermount3 0 0 0755
+    set_perm $MODPATH/system/bin/fusermount3 0 0 0755
     set_perm $MODPATH/service.sh 0 0 0755
     set_perm $MODPATH/system/bin/rclone 0 0 0755
     set_perm $MODPATH/syncd.sh 0 0 0755
     set_perm $MODPATH/inotifywait 0 0 0555
 
-    if [[ ! -e /system/bin/fusermount ]]; then
-        cp -af $MODPATH/system/bin/fusermount /system/bin/fusermount
-        set_perm /system/bin/fusermount 0 0 0755
+    if [[ ! -e /system/bin/fusermount3 ]]; then
+        cp -af $MODPATH/system/bin/fusermount3 /system/bin/fusermount3
+        set_perm /system/bin/fusermount3 0 0 0755
     fi
 
     case $ARCH32 in

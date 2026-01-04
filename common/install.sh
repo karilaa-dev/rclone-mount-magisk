@@ -3,8 +3,11 @@
 ui_print "+ Extracting rclone to $MODPATH/rclone"
 cp -af $MODPATH/common/binary/$ARCH/rclone $MODPATH/rclone
 
-ui_print "+ Extracting fusermount to $MODPATH/system/bin/fusermount"
-cp -af $MODPATH/common/binary/$ARCH/fusermount $MODPATH/system/bin/fusermount
+ui_print "+ Extracting fusermount3 to $MODPATH/system/bin/fusermount3"
+cp -af $MODPATH/common/binary/$ARCH/fusermount3 $MODPATH/system/bin/fusermount3
+
+ui_print "+ Extracting fusermount3 to $MODPATH/fusermount3"
+cp -af $MODPATH/common/binary/$ARCH/fusermount3 $MODPATH/fusermount3
 
 ui_print "+ Extracting syncd.sh script to $MODPATH/syncd.sh"
 cp -af $MODPATH/common/binary/syncd.sh $MODPATH/syncd.sh
@@ -25,7 +28,7 @@ case $ARCH32 in
         cp -af $MODPATH/common/lib/x86/libandroid-support.so $MODPATH/system/lib/libandroid-support.so
         if [ "$IS64BIT" = true ]; then
             ui_print "+ Extracting libandroid-support.so (x86_64) to $MODPATH/system/lib64/libandroid-support.so"
-            cp -af $MODPATH/common/lib/x86_64/libandroid-support.so $MODPATH/system/lib64/libandroid-support.so
+            cp -af $MODPATH/common/lib/x64/libandroid-support.so $MODPATH/system/lib64/libandroid-support.so
         fi
         ;;
 esac

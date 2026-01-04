@@ -2,10 +2,10 @@
 
 <div align="center">
   <!-- Version -->
-    <img src="https://img.shields.io/badge/Version-v1.14-blue.svg?longCache=true&style=for-the-badge"
+    <img src="https://img.shields.io/badge/Version-v1.15-blue.svg?longCache=true&style=for-the-badge"
       alt="Version" />
   <!-- Last Updated -->
-    <img src="https://img.shields.io/badge/Updated-April 22, 2021-green.svg?longCache=true&style=for-the-badge"
+    <img src="https://img.shields.io/badge/Updated-January 3, 2026-green.svg?longCache=true&style=for-the-badge"
       alt="_time_stamp_" />
   <!-- Min Magisk -->
     <img src="https://img.shields.io/badge/Magisk-20.0%2B-red.svg?longCache=true&style=for-the-badge"
@@ -60,7 +60,7 @@ specify `CACHEMODE=off` in `/sdcard/.rclone/.ALIASNAME.param`
 - Encrypted devices can not mount until unlock
 - Encrypted `rclone.conf` causes reboots
 - High cpu/mem in some apps with storage perms ([issue #9](https://github.com/Magisk-Modules-Repo/com.piyushgarg.rclone/issues/9))
-- The `fusermount` bin may not be compatible on all devices (see [thread](https://www.google.com/amp/s/forum.xda-developers.com/android/development/fusermount-android-rclone-mount-t3866652/amp/))
+- The `fusermount3` bin may not be compatible on all devices (see [thread](https://www.google.com/amp/s/forum.xda-developers.com/android/development/fusermount-android-rclone-mount-t3866652/amp/))
 
 ## Disclaimer
 - Neither the author nor devs will be held responsible for any damage/data loss that may occur during use of this module.
@@ -73,6 +73,6 @@ Always check this document before updating to new releases as significant change
 - rclone devs
 - pmj_pedro[@xda](https://forum.xda-developers.com/showpost.php?p=78147335&postcount=1)
 - agnostic-apollo[@xda](https://forum.xda-developers.com/showpost.php?p=79929083&postcount=12)
-- Termux for building and hosting binaries for [rclone](https://packages.termux.org/apt/termux-main/pool/main/r/rclone), [fusermount](https://grimler.se/termux-root-packages-24/pool/stable/libf/libfuse2/), [inotifywait](https://packages.termux.org/apt/termux-main/pool/main/i/inotify-tools), [libandroid-support.so](https://packages.termux.org/apt/termux-main/pool/main/liba/libandroid-support).
+- Termux for building and hosting binaries for [rclone](https://packages.termux.org/apt/termux-main/pool/main/r/rclone), [fusermount3](https://grimler.se/termux-root-packages-24/pool/stable/libf/libfuse3/), [inotifywait](https://packages.termux.org/apt/termux-main/pool/main/i/inotify-tools), [libandroid-support.so](https://packages.termux.org/apt/termux-main/pool/main/liba/libandroid-support).
 - improvements by geofferey@github
 - @Zackptg5 for MMT-EX Module template.
