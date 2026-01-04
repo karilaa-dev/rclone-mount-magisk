@@ -11,26 +11,21 @@
     <img src="https://img.shields.io/badge/Magisk-20.0%2B-red.svg?longCache=true&style=for-the-badge"
       alt="_time_stamp_" /></div>
 
-<div align="center">
-  <strong>This is the spiritual successor of <a href="https://github.com/Magisk-Modules-Repo/com.piyushgarg.rclone">rclone-mount</a> with bug fixes and newer binaries included. More details in the
-    <a href="https://github.com/AvinashReddy3108/rclone-mount-magisk/wiki">wiki</a>.
-</div>
+<p align="center">
+  Mount and sync your cloud storage on your Android device using <code>rclone</code> & <code>fusermount3</code>, providing virtually limitless storage expansion with support for dozens of cloud providers.
+</p>
 
-<div align="center">
-  <h3>
-    <a href="https://github.com/AvinashReddy3108/rclone-mount-magisk">
-      Source Code
-    </a>
-    <span> | </span>
-    <a href="https://github.com/Magisk-Modules-Repo/com.piyushgarg.rclone">
-      Original Module Repository
-    </a>
-    <span> | </span>
-    <a href="https://github.com/AvinashReddy3108/rclone-mount-magisk/issues">
-      Issues
-    </a>
-  </h3>
-</div>
+---
+
+### Supported Android Versions
+
+| Android Version | API Level | Status |
+|-----------------|-----------|--------|
+| Android 11+     | API 30+   | Fully supported (uses fusermount3) |
+| Android 7-10    | API 24-29 | Supported (legacy fusermount) |
+| Android 5-6     | API 21-23 | May work, not officially tested |
+
+> **Note:** This module requires Magisk 20.0+, KernelSU, or APatch.
 
 ### Features
 - Support for arm, arm64, & x86 (64bit too)
@@ -41,6 +36,27 @@
 - Specify custom rclone params for each remote via `/sdcard/.rclone/.REMOTE.param`
 - Access remotes via HTTP or (S)FTP clients, or bind the remotes to `/sdcard/Cloud/REMOTE` (recommended to [read this](https://github.com/Magisk-Modules-Repo/com.piyushgarg.rclone/issues/5)).
 - Support for Work Profiles.
+
+### Recent Changes
+
+#### v1.15
+- Updated for Android 11+ (API 30+) compatibility
+- Upgraded from `fusermount` to `fusermount3` for modern Android support
+- Updated all binaries to latest versions:
+  - `rclone` v1.72.1
+  - `fusermount3` (from fuse3)
+  - `inotifywait` (latest from Termux)
+  - `libandroid-support.so` (latest from Termux)
+- Added GitHub Actions for automated binary updates and releases
+
+#### v1.14
+- Used @Zackptg5's MMT-EX module template
+- Cleaned all install & wrapper scripts
+- Fixed bugs related to `rclone` command not working
+- Restored x86 and x86_64 support
+- Updated all binaries from Termux builds
+
+For full changelog, see [CHANGELOG.md](CHANGELOG.md).
 
 ### Configuration
 1. Copy your `rclone.conf` file (if you have one already) to `/sdcard/.rclone/rclone.conf` (can always be generated later.)
@@ -70,9 +86,19 @@ specify `CACHEMODE=off` in `/sdcard/.rclone/.ALIASNAME.param`
 Always check this document before updating to new releases as significant changes may occur.
 
 ## Credits
-- rclone devs
-- pmj_pedro[@xda](https://forum.xda-developers.com/showpost.php?p=78147335&postcount=1)
-- agnostic-apollo[@xda](https://forum.xda-developers.com/showpost.php?p=79929083&postcount=12)
-- Termux for building and hosting binaries for [rclone](https://packages.termux.org/apt/termux-main/pool/main/r/rclone), [fusermount3](https://grimler.se/termux-root-packages-24/pool/stable/libf/libfuse3/), [inotifywait](https://packages.termux.org/apt/termux-main/pool/main/i/inotify-tools), [libandroid-support.so](https://packages.termux.org/apt/termux-main/pool/main/liba/libandroid-support).
-- improvements by geofferey@github
-- @Zackptg5 for MMT-EX Module template.
+
+### Original Projects
+- [rclone-mount by AvinashReddy3108](https://github.com/AvinashReddy3108/rclone-mount-magisk) - Source repository this fork is based on
+- [Original rclone-mount module by piyushgarg](https://github.com/Magisk-Modules-Repo/com.piyushgarg.rclone) - The original Magisk module
+
+### Contributors & Resources
+- [rclone](https://rclone.org) developers
+- pmj_pedro [@xda](https://forum.xda-developers.com/showpost.php?p=78147335&postcount=1)
+- agnostic-apollo [@xda](https://forum.xda-developers.com/showpost.php?p=79929083&postcount=12)
+- [Termux](https://termux.dev) for building and hosting binaries:
+  - [rclone](https://packages.termux.org/apt/termux-main/pool/main/r/rclone)
+  - [fusermount3 (fuse3)](https://packages.termux.dev/apt/termux-main/pool/main/f/fuse3/)
+  - [inotifywait](https://packages.termux.org/apt/termux-main/pool/main/i/inotify-tools)
+  - [libandroid-support.so](https://packages.termux.org/apt/termux-main/pool/main/liba/libandroid-support)
+- geofferey @github for improvements
+- [@Zackptg5](https://github.com/Zackptg5) for MMT-EX Module template
