@@ -49,13 +49,6 @@
   - `libandroid-support.so` (latest from Termux)
 - Added GitHub Actions for automated binary updates and releases
 
-#### v1.14
-- Used @Zackptg5's MMT-EX module template
-- Cleaned all install & wrapper scripts
-- Fixed bugs related to `rclone` command not working
-- Restored x86 and x86_64 support
-- Updated all binaries from Termux builds
-
 For full changelog, see [CHANGELOG.md](CHANGELOG.md).
 
 ### Configuration
