@@ -11,14 +11,11 @@ CLOUDROOTMOUNTPOINT=/mnt/cloud
 USER_CONFDIR=/sdcard/.rclone
 USER_CONF=${USER_CONFDIR}/rclone.conf
 PROFILE=0
+SDMOUNTDIR=Cloud
 DATA_MEDIA=/data/media
 RUNTIME_R=/mnt/runtime/read
 RUNTIME_W=/mnt/runtime/write
 RUNTIME_D=/mnt/runtime/default
-BINDPOINT_R=${RUNTIME_R}/emulated/${PROFILE}/Cloud
-BINDPOINT_W=${RUNTIME_W}/emulated/${PROFILE}/Cloud
-BINDPOINT_D=${RUNTIME_D}/emulated/${PROFILE}/Cloud
-SD_BINDPOINT=${BINDPOINT_D}
 DISABLE=0
 NETCHK=1
 NETCHK_ADDR=google.com
@@ -68,7 +65,7 @@ fi
 
 custom_params () {
     if [[ ${remote} = global ]]; then
-        PARAMS="DISABLE LOGFILE LOGLEVEL CACHEMODE CHUNKSIZE CHUNKTOTAL CACHEWORKERS CACHEINFOAGE DIRCACHETIME ATTRTIMEOUT BUFFERSIZE READAHEAD M_UID M_GID DIRPERMS FILEPERMS READONLY BINDSD ADD_PARAMS REPLACE_PARAMS NETCHK NETCHK_IF NETCHK_ADDR HTTP FTP HTTP_ADDR FTP_ADDR SFTP SFTP_ADDR SFTP_USER SFTP_PASS PROFILE ISOLATE"
+        PARAMS="DISABLE LOGFILE LOGLEVEL CACHEMODE CHUNKSIZE CHUNKTOTAL CACHEWORKERS CACHEINFOAGE DIRCACHETIME ATTRTIMEOUT BUFFERSIZE READAHEAD M_UID M_GID DIRPERMS FILEPERMS READONLY BINDSD ADD_PARAMS REPLACE_PARAMS NETCHK NETCHK_IF NETCHK_ADDR HTTP FTP HTTP_ADDR FTP_ADDR SFTP SFTP_ADDR SFTP_USER SFTP_PASS PROFILE ISOLATE SDMOUNTDIR"
     else
         PARAMS="DISABLE LOGFILE LOGLEVEL CACHEMODE CHUNKSIZE CHUNKTOTAL CACHEWORKERS CACHEINFOAGE DIRCACHETIME ATTRTIMEOUT BUFFERSIZE READAHEAD M_UID M_GID DIRPERMS FILEPERMS READONLY BINDSD SDBINDPOINT ADD_PARAMS REPLACE_PARAMS PROFILE ISOLATE SDSYNCDIRS SYNC_WIFI SYNC_BATTLVL SYNC_CHARGE SUBPATH"
     fi
@@ -115,14 +112,14 @@ net_chk() {
 sd_unbind () {
     if [[ -z ${SDBINDPOINT} ]]; then
         # Unbind legacy paths (Android 10 and below)
-        UNBINDPOINT=${BINDPOINT_D}/${remote}
+        UNBINDPOINT=${RUNTIME_D}/emulated/${PROFILE}/${SDMOUNTDIR}/${remote}
         su -M -c umount -lf ${UNBINDPOINT} >> /dev/null 2>&1
-        UNBINDPOINT=${BINDPOINT_R}/${remote}
+        UNBINDPOINT=${RUNTIME_R}/emulated/${PROFILE}/${SDMOUNTDIR}/${remote}
         su -M -c umount -lf ${UNBINDPOINT} >> /dev/null 2>&1
-        UNBINDPOINT=${BINDPOINT_W}/${remote}
+        UNBINDPOINT=${RUNTIME_W}/emulated/${PROFILE}/${SDMOUNTDIR}/${remote}
         su -M -c umount -lf ${UNBINDPOINT} >> /dev/null 2>&1
         # Unbind Android 11+ path
-        UNBINDPOINT=${DATA_MEDIA}/${PROFILE}/Cloud/${remote}
+        UNBINDPOINT=${DATA_MEDIA}/${PROFILE}/${SDMOUNTDIR}/${remote}
         su -M -c umount -lf ${UNBINDPOINT} >> /dev/null 2>&1
     else
         USER_BINDPOINT=${SDBINDPOINT}
@@ -148,30 +145,30 @@ sd_binder () {
     API=$(getprop ro.build.version.sdk)
 
     if [[ -z ${SDBINDPOINT} ]]; then
-        mkdir -p ${DATA_MEDIA}/${PROFILE}/Cloud/${remote}
-        chown media_rw:media_rw ${DATA_MEDIA}/${PROFILE}/Cloud/${remote}
+        mkdir -p ${DATA_MEDIA}/${PROFILE}/${SDMOUNTDIR}/${remote}
+        chown media_rw:media_rw ${DATA_MEDIA}/${PROFILE}/${SDMOUNTDIR}/${remote}
 
         if [[ ${API} -ge 30 ]]; then
             # Android 11+ (API 30+): bind directly to /data/media which is the underlying storage for /sdcard
-            BINDPOINT=${DATA_MEDIA}/${PROFILE}/Cloud/${remote}
+            BINDPOINT=${DATA_MEDIA}/${PROFILE}/${SDMOUNTDIR}/${remote}
             su -M -c mount --bind ${CLOUDROOTMOUNTPOINT}/${remote} ${BINDPOINT} >> /dev/null 2>&1
         elif [[ -d ${RUNTIME_D} ]]; then
             # Android 10 and below: use /mnt/runtime paths
-            BINDPOINT=${BINDPOINT_D}/${remote}
+            BINDPOINT=${RUNTIME_D}/emulated/${PROFILE}/${SDMOUNTDIR}/${remote}
             su -M -c mount --bind ${CLOUDROOTMOUNTPOINT}/${remote} ${BINDPOINT} >> /dev/null 2>&1
 
-            BINDPOINT=${BINDPOINT_R}/${remote}
+            BINDPOINT=${RUNTIME_R}/emulated/${PROFILE}/${SDMOUNTDIR}/${remote}
             if ! mount |grep -q ${BINDPOINT}; then
                 su -M -c mount --bind ${CLOUDROOTMOUNTPOINT}/${remote} ${BINDPOINT} >> /dev/null 2>&1
             fi
 
-            BINDPOINT=${BINDPOINT_W}/${remote}
+            BINDPOINT=${RUNTIME_W}/emulated/${PROFILE}/${SDMOUNTDIR}/${remote}
             if ! mount |grep -q ${BINDPOINT}; then
                 su -M -c mount --bind ${CLOUDROOTMOUNTPOINT}/${remote} ${BINDPOINT} >> /dev/null 2>&1
             fi
         fi
 
-        echo "[$remote] available at: -> [/sdcard/Cloud/${remote}]"
+        echo "[$remote] available at: -> [/sdcard/${SDMOUNTDIR}/${remote}]"
     else
         mkdir ${DATA_MEDIA}/${PROFILE}/${SDBINDPOINT} >> /dev/null 2>&1
         chown media_rw:media_rw ${DATA_MEDIA}/${PROFILE}/${SDBINDPOINT}
